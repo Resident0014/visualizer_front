@@ -12,8 +12,10 @@ export const getCfgData = (code, tree) => {
     MULTIPLY: '*',
     DIVIDE: '/',
     REMAINDER: '%',
-    ASSIGN: '',
-    POSTFIX_INCREMENT: '++'
+    XOR: '^',
+    BINARY_AND: '&',
+    BINARY_OR: '|',
+    ASSIGN: ''
   }
 
   const edgesQueue = []
@@ -220,6 +222,5 @@ export const cfgDataToDigraph = (cfgData) => {
     }
     lines.push(line)
   }
-  // console.log(`digraph {\n${lines.join(';\n')}\n}`)
   return `digraph { ${lines.join(';')} }`
 }

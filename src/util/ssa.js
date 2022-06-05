@@ -6,8 +6,10 @@ const operators = {
   MULTIPLY: '*',
   DIVIDE: '/',
   REMAINDER: '%',
-  ASSIGN: '',
-  POSTFIX_INCREMENT: '++'
+  XOR: '^',
+  BINARY_AND: '&',
+  BINARY_OR: '|',
+  ASSIGN: ''
 }
 
 const getReadVariables = (node) => {
@@ -48,6 +50,24 @@ const getReadVariables = (node) => {
     },
     UnaryExpr: (expr) => {
       addItem(expr.expression)
+    },
+    ArrayCreationExpr: (expr) => {
+      for (const level of expr.levels) {
+        addItem(level)
+      }
+    },
+    ArrayCreationLevel: (expr) => {
+      addItem(expr.dimension)
+    },
+    FieldAccessExpr: (expr) => {
+      addItem(expr.scope)
+    },
+    ArrayAccessExpr: (expr) => {
+      addItem(expr.name)
+      addItem(expr.index)
+    },
+    EnclosedExpr: (expr) => {
+      addItem(expr.inner)
     },
     NameExpr: (expr) => {
       addItem(expr.name)
@@ -91,6 +111,13 @@ const getWriteVariables = (node) => {
     },
     UnaryExpr: (expr) => {
       addItem(expr.expression)
+    },
+    FieldAccessExpr: (expr) => {
+      addItem(expr.scope)
+    },
+    ArrayAccessExpr: (expr) => {
+      addItem(expr.name)
+      addItem(expr.index)
     },
     NameExpr: (expr) => {
       addItem(expr.name)
@@ -283,6 +310,7 @@ const addVariables = (nodes) => {
     node.readVariables = getReadVariables(node)
     node.writeVariables = getWriteVariables(node)
   }
+  console.log(nodes)
 }
 
 const subNums = '₀₁₂₃₄₅₆₇₈₉'
@@ -313,8 +341,9 @@ const addVariableVersions = (nodes, edges) => {
     varVersions[v] = (varVersions[v] || 0) + 1
     return varVersions[v]
   }
-  const setVariableVersions = (node, varContext, fromIdx) => {
+  const setVariableVersions = (node, fromIdx) => {
     let runSubnodes = true
+    const varContext = { ...nodes[fromIdx].varContext, ...nodes[fromIdx].writeVariableVersions }
     if (node.isMultiFrom) {
       runSubnodes = false
       for (const [v, version] of Object.entries(varContext)) {
@@ -323,39 +352,33 @@ const addVariableVersions = (nodes, edges) => {
         if (!map) {
           node.versionsByFrom[v] = map = new Map()
         }
-        const maxVersion = Math.max(map.get(fromIdx) || 0, version)
-        if (map.get(fromIdx) !== maxVersion) {
+        if (map.get(fromIdx) !== version) {
           runSubnodes = true
         }
         const versionsSet = new Set(map.values())
-        map.set(fromIdx, maxVersion)
+        map.set(fromIdx, version)
         if (map.size === 1) {
-          node.varContext[v] = maxVersion
-        } else if (versionsSet.size === 1 && !versionsSet.has(maxVersion)) {
+          node.varContext[v] = version
+        } else if (versionsSet.size === 1 && !versionsSet.has(version)) {
           node.varContext[v] = getNextVersion(v)
         }
       }
     } else {
-      for (const [varName, version] of Object.entries(varContext)) {
-        node.varContext[varName] = Math.max(node.varContext[varName] || 0, version)
-      }
+      Object.assign(node.varContext, varContext)
     }
-    if (node.writeVariables.size > 0) {
-      varContext = { ...varContext, ...node.writeVariableVersions }
-      if (!node.visited) {
-        node.visited = true
-        for (const v of node.writeVariables.keys()) {
-          node.writeVariableVersions[v] = varContext[v] = getNextVersion(v)
-        }
+    if (node.writeVariables.size > 0 && !node.visited) {
+      node.visited = true
+      for (const v of node.writeVariables.keys()) {
+        node.writeVariableVersions[v] = getNextVersion(v)
       }
     }
     if (runSubnodes) {
       for (const subnode of node.nodesTo) {
-        setVariableVersions(subnode, varContext, node.idx)
+        setVariableVersions(subnode, node.idx)
       }
     }
   }
-  setVariableVersions(nodes[0], {})
+  setVariableVersions(nodes[0], 0)
 }
 
 const fixVariableVersions = (nodes) => {
@@ -429,37 +452,32 @@ const addNodeLabels = (code, nodes) => {
   }
   const getCode = (elem) => getFixedCodeByRange(fixedCode, elem.range).join('')
   for (const node of nodes) {
-    const labelLines = []
-    // if (node.isMultiFrom) {
-    //   const phi = Object.entries(node.phiNodes).map(([v, set]) => `${v} = Ф{${[...set].join(',')}}`).join('; ')
-    //   labelLines.push(`phi(${phi})`)
-    // }
-    // const context = Object.entries(node.varContext).map(e => `${e[0]}:${e[1]}`).join(', ')
-    // labelLines.push(`c(${context})`)
     const { elem } = node
     if (node.type === 'method') {
-      const params = elem.parameters.map(p => p.name.identifier + getSubNumberStr(node.writeVariableVersions[p.name.identifier])).join(', ')
-      labelLines.push(`${elem.name.identifier}(${params})`)
+      const params = elem.parameters.map(p => getCode(p.name)).join(', ')
+      node.label = `${elem.name.identifier}(${params})`
     } else if (node.type === 'statement' || node.type === 'condition') {
-      if (getType(elem['!']) === 'AssignExpr' && elem.operator !== 'ASSIGN') {
+      const type = getType(elem['!'])
+      if (type === 'AssignExpr' && elem.operator !== 'ASSIGN') {
         const varName = elem.target.name.identifier
         const readVarVersion = varName + getSubNumberStr(node.varContext[varName])
         let rightSide = getCode(elem.value)
         if (getType(elem.value['!']) === 'BinaryExpr') {
           rightSide = `(${rightSide})`
         }
-        labelLines.push(`${getCode(elem.target)} = ${readVarVersion} ${operators[node.elem.operator]} ${rightSide}`)
+        node.label = `${getCode(elem.target)} = ${readVarVersion} ${operators[node.elem.operator]} ${rightSide}`
+      } else if (type === 'UnaryExpr' && elem.operator.includes('CREMENT')) {
+        const varName = elem.expression.name.identifier
+        const writeVarVersion = varName + getSubNumberStr(node.writeVariableVersions[varName])
+        const readVarVersion = varName + getSubNumberStr(node.varContext[varName])
+        const sign = elem.operator.includes('INCREMENT') ? '+' : '-'
+        node.label = `${writeVarVersion} = ${readVarVersion} ${sign} 1`
       } else {
-        labelLines.push(getCode(elem))
+        node.label = getCode(elem)
       }
     } else if (node.type === 'return') {
-      labelLines.push(`return ${getCode(elem)}`)
+      node.label = `return ${getCode(elem)}`
     }
-    // if (node.writeVariables.size > 0) {
-    //   const write = Object.entries(node.writeVariableVersions).map(e => `${e[0]}:${e[1]}`).join(', ')
-    //   labelLines.push(`w(${write})`)
-    // }
-    node.label = labelLines.join('\n')
   }
 }
 
@@ -467,8 +485,7 @@ export const dataToSsaDigraph = (code, tree) => {
   const cfgData = getCfgData(tree)
   addVariables(cfgData.nodes)
   addVariableVersions(cfgData.nodes, cfgData.edges)
-  console.log(fixVariableVersions) // (cfgData.nodes)
-  // fixVariableVersions(cfgData.nodes)
+  fixVariableVersions(cfgData.nodes)
   addNodeLabels(code, cfgData.nodes)
 
   const lines = []
@@ -530,6 +547,5 @@ export const dataToSsaDigraph = (code, tree) => {
     }
     lines.push(line)
   }
-  console.log(`digraph {\n${lines.join(';\n')}\n}`)
   return `digraph { ${lines.join(';')} }`
 }

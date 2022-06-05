@@ -143,7 +143,7 @@ const getInstructionEdges = (nodes, tree) => {
 
 const getVarEdges = (nodes, hierarchy) => {
   const declTypes = ['VariableDeclarator', 'Parameter']
-  const useNodeIdx = {}
+  const useNodeIdxByVar = {}
   const declNodeIdxByVar = {}
   for (const [i, n] of nodes.entries()) {
     if (n.orig && n.orig._type === 'SimpleName') {
@@ -152,16 +152,16 @@ const getVarEdges = (nodes, hierarchy) => {
       if (declTypes.includes(nodes[n.from].orig._type)) {
         declNodeIdxByVar[varName] = identifierIdx
       } else {
-        if (!useNodeIdx[varName]) {
-          useNodeIdx[varName] = []
+        if (!useNodeIdxByVar[varName]) {
+          useNodeIdxByVar[varName] = []
         }
-        useNodeIdx[varName].push(identifierIdx)
+        useNodeIdxByVar[varName].push(identifierIdx)
       }
     }
   }
   const varEdges = []
   for (const [varName, declIdx] of Object.entries(declNodeIdxByVar)) {
-    for (const useIdx of useNodeIdx[varName]) {
+    for (const useIdx of useNodeIdxByVar[varName]) {
       varEdges.push({ from: useIdx, to: declIdx })
     }
   }
@@ -191,6 +191,5 @@ export const dataToAsgDigraph = ({ nodes, edges, varEdges, instrEdges }) => {
   for (const edge of instrEdges) {
     lines.push(`n${edge.from} -> n${edge.to} [style="dashed", constraint=false, color="red"]`)
   }
-  console.log(`digraph {\n${lines.map(s => s.replace('\n', ' ')).join(';\n')}\n}`)
   return `digraph { ${lines.join(';')} }`
 }

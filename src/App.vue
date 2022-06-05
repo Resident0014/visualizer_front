@@ -3,7 +3,7 @@
     <div class="left">
       <div class="d-flex flex-column">
         <div class="flex-fill">
-          <textarea class="code" :class="{ wrong: codeIsWrong }" placeholder="code here" v-model="code"></textarea>
+          <textarea class="code" :class="{ wrong: codeIsWrong }" placeholder="Java method code here" v-model="code"></textarea>
         </div>
       </div>
     </div>
@@ -44,7 +44,7 @@
           <PDG v-if="astTree" :code="code" :astTree="astTreeExtended" class="flex-fill" />
         </template>
         <template v-else-if="activeTab === 'asg'">
-          <ASG v-if="astTree" :code="code" :astTreeExtended="astTreeExtended" :astTree="astTree" class="flex-fill" />
+          <ASG v-if="astTree" :code="code" :astTree="astTree" class="flex-fill" />
         </template>
         <template v-else-if="activeTab === 'ssa'">
           <SSA v-if="astTree" :code="code" :astTree="astTreeExtended" class="flex-fill" />
@@ -121,16 +121,6 @@ export default {
 }
 body {
   margin: 0;
-}
-.node {
-  height: 50px;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  color: white;
-  width: 200px;
-  justify-content: center;
-  flex-direction: column;
 }
 .d-flex {
   display: flex;

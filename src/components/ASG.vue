@@ -13,10 +13,6 @@ export default {
       type: Object,
       required: true
     },
-    astTreeExtended: {
-      type: Object,
-      required: true
-    },
     code: {
       type: String,
       required: true

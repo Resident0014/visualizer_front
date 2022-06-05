@@ -61,6 +61,5 @@ export const dataToAstDigraph = (nodes, edges) => {
     if (edge.hidden) continue
     lines.push(`n${edge.from} -> n${edge.to}`)
   }
-  console.log(`digraph {\n${lines.join(';\n')}\n}`)
   return `digraph { ${lines.join(';')} }`
 }

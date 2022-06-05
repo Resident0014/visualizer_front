@@ -43,6 +43,24 @@ const getNodeReadVariables = (node) => {
     UnaryExpr: (expr) => {
       addItem(expr.expression)
     },
+    ArrayCreationExpr: (expr) => {
+      for (const level of expr.levels) {
+        addItem(level)
+      }
+    },
+    ArrayCreationLevel: (expr) => {
+      addItem(expr.dimension)
+    },
+    FieldAccessExpr: (expr) => {
+      addItem(expr.scope)
+    },
+    ArrayAccessExpr: (expr) => {
+      addItem(expr.name)
+      addItem(expr.index)
+    },
+    EnclosedExpr: (expr) => {
+      addItem(expr.inner)
+    },
     NameExpr: (expr) => {
       addItem(expr.name)
     },
@@ -98,12 +116,12 @@ const getNodeWriteVariables = (node) => {
   return set
 }
 
-const setWrittenVariables = (nodes, from, vars) => {
+const setVarContext = (nodes, from, vars) => {
   let changed = false
   for (const [v, nodeIdx] of Object.entries(vars)) {
-    let w = nodes[from].writtenVariables[v]
+    let w = nodes[from].varContext[v]
     if (!w) {
-      w = nodes[from].writtenVariables[v] = new Set()
+      w = nodes[from].varContext[v] = new Set()
     }
     if (!w.has(nodeIdx)) {
       w.add(nodeIdx)
@@ -116,7 +134,7 @@ const setWrittenVariables = (nodes, from, vars) => {
   }
   for (const to of nodes[from].jumps) {
     if (!nodes[to].visited || changed) {
-      setWrittenVariables(nodes, to, { ...vars })
+      setVarContext(nodes, to, { ...vars })
     }
   }
 }
@@ -124,11 +142,9 @@ const setWrittenVariables = (nodes, from, vars) => {
 const getDeps = (nodes) => {
   const deps = []
   for (const [to, node] of nodes.entries()) {
-    for (const [v, set] of Object.entries(node.writtenVariables)) {
-      if (node.readVariables.has(v)) {
-        for (const from of set) {
-          deps.push({ from, to })
-        }
+    for (const v of node.readVariables) {
+      for (const from of node.varContext[v]) {
+        deps.push({ from, to })
       }
     }
   }
@@ -139,14 +155,14 @@ const getData = (code, tree) => {
   const { nodes, edges } = getCfgData(code, tree)
   for (const node of nodes) {
     node.jumps = []
-    node.writtenVariables = {}
+    node.varContext = {}
     node.readVariables = getNodeReadVariables(node)
     node.writeVariables = getNodeWriteVariables(node)
   }
   for (const edge of edges) {
     nodes[edge.from].jumps.push(edge.to)
   }
-  setWrittenVariables(nodes, 0, {})
+  setVarContext(nodes, 0, {})
   const deps = getDeps(nodes)
   return { nodes, edges, deps }
 }
@@ -164,7 +180,7 @@ const dataToDigraph = (code, tree, defaultEdgeAttr) => {
       shape = 'diamond'
     }
     // node.label += ` (r:[${[...node.readVariables].join(',')}], w:[${[...node.writeVariables].join(',')}])`
-    // node.label += ' (' + Object.entries(node.writtenVariables).map(e => `${e[0]}:[${[...e[1]]}]`).join(',') + ')'
+    // node.label += ' (' + Object.entries(node.varContext).map(e => `${e[0]}:[${[...e[1]]}]`).join(',') + ')'
     lines.push(`n${i} [label="${escapeQuotes(node.label)}", shape="${shape}"]`)
   }
   for (const edge of data.edges) {
@@ -182,7 +198,6 @@ const dataToDigraph = (code, tree, defaultEdgeAttr) => {
   for (const edge of data.deps) {
     lines.push(`n${edge.from} -> n${edge.to} [style="dashed", constraint=false]`)
   }
-  // console.log(`digraph {\n${lines.join(';\n')}\n}`)
   return `digraph { ${lines.join(';')} }`
 }
 

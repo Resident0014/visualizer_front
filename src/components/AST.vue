@@ -41,13 +41,12 @@ export default {
     onMounted(reload)
 
     const isSubnode = (parentIdx, childIdx) => {
-      const h = digraphData.value.hierarchy
-      for (const idx of h[parentIdx] || []) {
-        if (idx === childIdx || isSubnode(idx, childIdx)) {
-          return true
-        }
+      let idx = childIdx
+      while (true) {
+        idx = digraphData.value.nodes[idx].from
+        if (!idx) return false
+        if (idx === parentIdx) return true
       }
-      return false
     }
 
     const nodeClickHandler = (e) => {
