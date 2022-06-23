@@ -161,7 +161,7 @@ const getVarEdges = (nodes, hierarchy) => {
   }
   const varEdges = []
   for (const [varName, declIdx] of Object.entries(declNodeIdxByVar)) {
-    for (const useIdx of useNodeIdxByVar[varName]) {
+    for (const useIdx of useNodeIdxByVar[varName] || []) {
       varEdges.push({ from: useIdx, to: declIdx })
     }
   }

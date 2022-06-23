@@ -143,7 +143,7 @@ const getDeps = (nodes) => {
   const deps = []
   for (const [to, node] of nodes.entries()) {
     for (const v of node.readVariables) {
-      for (const from of node.varContext[v]) {
+      for (const from of node.varContext[v] || []) {
         deps.push({ from, to })
       }
     }

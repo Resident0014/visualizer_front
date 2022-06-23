@@ -1,10 +1,18 @@
 <template>
   <div class="d-flex h-full">
     <div class="left">
-      <div class="d-flex flex-column">
-        <div class="flex-fill">
-          <textarea class="code" :class="{ wrong: codeIsWrong }" placeholder="Java method code here" v-model="code"></textarea>
-        </div>
+      <div
+        class="code"
+        :class="{ wrong: codeIsWrong }"
+      >
+        <VAceEditor
+          class="editor"
+          lang="java"
+          theme="chrome"
+          placeholder="Java method code here"
+          :value="code"
+          @update:value="e => code = e"
+        />
       </div>
     </div>
     <div class="right">
@@ -57,6 +65,9 @@
 <script>
 import axios from 'axios'
 import { ref, watch } from 'vue'
+import { VAceEditor } from 'vue3-ace-editor'
+import 'ace-builds/src-noconflict/mode-java'
+import 'ace-builds/src-noconflict/theme-chrome'
 import AST from './components/AST'
 import CFG from './components/CFG'
 import DDG from './components/DDG'
@@ -71,7 +82,8 @@ export default {
     DDG,
     PDG,
     ASG,
-    SSA
+    SSA,
+    VAceEditor
   },
   setup() {
     const code = ref('')
@@ -157,16 +169,14 @@ body {
   margin-top: 15px;
 }
 .code {
-  width: 100%;
   height: 100%;
-  font-family: monospace;
-  padding: 5px 8px;
-  font-size: inherit;
-  color: black;
-  resize: none;
-  outline: none;
+  position: relative;
+  border: 1px solid black;
 }
-.code.wrong {
+.code.wrong .ace_content {
   background-color: #ff00001f;
+}
+.editor {
+  height: 100%;
 }
 </style>
